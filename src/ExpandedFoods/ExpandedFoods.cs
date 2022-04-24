@@ -20,7 +20,7 @@ namespace ExpandedFoods
 {
     public class ExpandedFoods : ModSystem
     {
-        private Harmony harmony;
+        private static Harmony harmony;
 
         public override void Start(ICoreAPI api)
         {
@@ -36,6 +36,9 @@ namespace ExpandedFoods
             api.RegisterBlockClass("BlockMeatHooks", typeof(BlockMeatHooks));
             api.RegisterBlockEntityClass("MeatHooks", typeof(BlockEntityMeatHooks));
 
+            api.RegisterBlockClass("BlockBottleRack", typeof(BlockBottleRack));
+            api.RegisterBlockEntityClass("BottleRack", typeof(BlockEntityBottleRack));
+
             api.RegisterBlockClass("BlockMixingBowl", typeof(BlockMixingBowl));
             api.RegisterBlockEntityClass("MixingBowl", typeof(BlockEntityMixingBowl));
 
@@ -48,9 +51,6 @@ namespace ExpandedFoods
             api.RegisterBlockClass("BlockSaucepan", typeof(BlockSaucepan));
             api.RegisterBlockEntityClass("Saucepan", typeof(BlockEntitySaucepan));
 
-            api.RegisterBlockClass("BlockScrewPress", typeof(BlockScrewPress));
-            api.RegisterBlockEntityClass("BEScrewPress", typeof(BEScrewPress));
-
             api.RegisterBlockClass("BlockExpandedClayOven", typeof(BlockExpandedClayOven));
             api.RegisterBlockEntityClass("ExpandedOven", typeof(BlockEntityExpandedOven));
 
@@ -62,8 +62,11 @@ namespace ExpandedFoods
             api.RegisterItemClass("ExpandedLiquid", typeof(ItemExpandedLiquid));
             api.RegisterItemClass("ExpandedDough", typeof(ItemExpandedDough));
 
-            harmony = new Harmony("com.jakecool19.expandedfoods.cookingoverhaul");
-            harmony.PatchAll(Assembly.GetExecutingAssembly());
+			if (harmony == null)
+            {
+                harmony = new Harmony("com.jakecool19.expandedfoods.cookingoverhaul");
+                harmony.PatchAll(Assembly.GetExecutingAssembly());
+            }
         }
 
         public override void Dispose()

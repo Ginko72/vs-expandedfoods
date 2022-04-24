@@ -10,10 +10,11 @@ using Vintagestory.API.Config;
 using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
 using Vintagestory.API.Util;
+using Vintagestory.GameContent;
 
 namespace ExpandedFoods
 {
-    public class ItemExpandedRawFood : Item, IExpandedFood
+    public class ItemExpandedRawFood : Item, IExpandedFood //, IContainedMeshSource, IContainedCustomName
     {
         public float SatMult
         {
@@ -601,7 +602,7 @@ namespace ExpandedFoods
 
             return "";
         }
-
+/*
         public override RichTextComponentBase[] GetHandbookInfo(ItemSlot inSlot, ICoreClientAPI capi, ItemStack[] allStacks, ActionConsumable<string> openDetailPageFor)
         {
             ItemStack stack = inSlot.Itemstack;
@@ -813,7 +814,7 @@ namespace ExpandedFoods
 
 
             Dictionary<AssetLocation, ItemStack> alloyables = new Dictionary<AssetLocation, ItemStack>();
-            foreach (var val in capi.World.Alloys)
+            foreach (var val in capi.GetMetalAlloys())
             {
                 foreach (var ing in val.Ingredients)
                 {
@@ -898,7 +899,7 @@ namespace ExpandedFoods
             // Alloyable from
 
             Dictionary<AssetLocation, MetalAlloyIngredient[]> alloyableFrom = new Dictionary<AssetLocation, MetalAlloyIngredient[]>();
-            foreach (var val in capi.World.Alloys)
+            foreach (var val in capi.GetMetalAlloys())
             {
                 if (val.Output.ResolvedItemstack.Equals(capi.World, stack, GlobalConstants.IgnoredStackAttributes))
                 {
@@ -938,7 +939,8 @@ namespace ExpandedFoods
 
             List<ItemStack> recipestacks = new List<ItemStack>();
 
-            /*foreach (var recval in capi.World.GridRecipes)
+            // COMMENT THIS OUT
+            foreach (var recval in capi.World.GridRecipes)
             {
                 foreach (var val in recval.resolvedIngredients)
                 {
@@ -968,10 +970,41 @@ namespace ExpandedFoods
                     }
                 }
 
-            }*/
+            }
+
+            foreach (var recval in capi.World.GridRecipes)
+            {
+                foreach (var val in recval.resolvedIngredients)
+                {
+                    CraftingRecipeIngredient ingred = val;
+
+                    if (ingred != null && ingred.SatisfiesAsIngredient(maxstack) && !recipestacks.Any(s => s.Equals(capi.World, recval.Output.ResolvedItemstack, GlobalConstants.IgnoredStackAttributes)))
+                    {
+                        ItemStack outstack = recval.Output.ResolvedItemstack;
+                        DummySlot outSlot = new DummySlot(outstack);
+
+                        DummySlot[] inSlots = new DummySlot[recval.Width * recval.Height];
+                        for (int x = 0; x < recval.Width; x++)
+                        {
+                            for (int y = 0; y < recval.Height; y++)
+                            {
+                                CraftingRecipeIngredient inIngred = recval.GetElementInGrid(y, x, recval.resolvedIngredients, recval.Width);
+                                ItemStack ingredStack = inIngred?.ResolvedItemstack?.Clone();
+                                if (inIngred == val) ingredStack = maxstack;
+
+                                inSlots[y * recval.Width + x] = new DummySlot(ingredStack);
+                            }
+                        }
 
 
-            foreach (var val in capi.World.SmithingRecipes)
+                        outstack.Collectible.OnCreatedByCrafting(inSlots, outSlot, recval);
+                        recipestacks.Add(outSlot.Itemstack);
+                    }
+                }
+
+            }
+
+            foreach (var val in capi.GetSmithingRecipes())
             {
                 if (val.Ingredient.SatisfiesAsIngredient(maxstack) && !recipestacks.Any(s => s.Equals(capi.World, val.Output.ResolvedItemstack, GlobalConstants.IgnoredStackAttributes)))
                 {
@@ -980,7 +1013,7 @@ namespace ExpandedFoods
             }
 
 
-            foreach (var val in capi.World.ClayFormingRecipes)
+            foreach (var val in capi.GetClayformingRecipes())
             {
                 if (val.Ingredient.SatisfiesAsIngredient(maxstack) && !recipestacks.Any(s => s.Equals(capi.World, val.Output.ResolvedItemstack, GlobalConstants.IgnoredStackAttributes)))
                 {
@@ -989,7 +1022,7 @@ namespace ExpandedFoods
             }
 
 
-            foreach (var val in capi.World.KnappingRecipes)
+            foreach (var val in capi.GetKnappingRecipes())
             {
                 if (val.Ingredient.SatisfiesAsIngredient(maxstack) && !recipestacks.Any(s => s.Equals(capi.World, val.Output.ResolvedItemstack, GlobalConstants.IgnoredStackAttributes)))
                 {
@@ -998,7 +1031,7 @@ namespace ExpandedFoods
             }
 
 
-            foreach (var recipe in capi.World.BarrelRecipes)
+            foreach (var recipe in capi.GetBarrelRecipes())
             {
                 foreach (var ingred in recipe.Ingredients)
                 {
@@ -1041,7 +1074,7 @@ namespace ExpandedFoods
             bool knappable = false;
             bool clayformable = false;
 
-            foreach (var val in capi.World.SmithingRecipes)
+            foreach (var val in capi.GetSmithingRecipes())
             {
                 if (val.Output.ResolvedItemstack.Equals(capi.World, stack, GlobalConstants.IgnoredStackAttributes))
                 {
@@ -1050,7 +1083,7 @@ namespace ExpandedFoods
                 }
             }
 
-            foreach (var val in capi.World.KnappingRecipes)
+            foreach (var val in capi.GetKnappingRecipes())
             {
                 if (val.Output.ResolvedItemstack.Equals(capi.World, stack, GlobalConstants.IgnoredStackAttributes))
                 {
@@ -1060,7 +1093,7 @@ namespace ExpandedFoods
             }
 
 
-            foreach (var val in capi.World.ClayFormingRecipes)
+            foreach (var val in capi.GetClayformingRecipes())
             {
                 if (val.Output.ResolvedItemstack.Equals(capi.World, stack, GlobalConstants.IgnoredStackAttributes))
                 {
@@ -1149,7 +1182,7 @@ namespace ExpandedFoods
 
             List<RichTextComponentBase> barrelRecipestext = new List<RichTextComponentBase>();
             Dictionary<string, List<BarrelRecipe>> brecipesbyName = new Dictionary<string, List<BarrelRecipe>>();
-            foreach (var recipe in capi.World.BarrelRecipes)
+            foreach (var recipe in capi.GetBarrelRecipes())
             {
                 ItemStack mixdStack = recipe.Output.ResolvedItemstack;
 
@@ -1334,7 +1367,8 @@ namespace ExpandedFoods
 
                 if (grecipes.Count > 0)
                 {
-                    /*if (knappable) - whats this for? o.O */
+                    
+                    // COMMENT THIS LINE OUT ONLY if (knappable) - whats this for? o.O 
                     components.Add(new RichTextComponent(capi, "• " + Lang.Get("Crafting") + "\n", CairoFont.WhiteSmallText()));
 
                     components.Add(new SlideshowGridRecipeTextComponent(capi, grecipes.ToArray(), 40, EnumFloat.None, (cs) => openDetailPageFor(GuiHandbookItemStackPage.PageCodeForStack(cs)), allStacks));
@@ -1381,6 +1415,7 @@ namespace ExpandedFoods
             return components.ToArray();
         }
 
+        */
         class ExtraSection { public string Title = null; public string Text = null; }
 
         public override TransitionState[] UpdateAndGetTransitionStates(IWorldAccessor world, ItemSlot inslot)
@@ -1406,7 +1441,7 @@ namespace ExpandedFoods
 
             ITreeAttribute attr = (ITreeAttribute)itemstack.Attributes["transitionstate"];
 
-            //TransitionableProperties[] props = itemstack.Collectible.TransitionableProps; - WTF is this here for? we already have propsm
+            //TransitionableProperties[] props = itemstack.Collectible.TransitionableProps; - WTF is this here for? we already have props
 
             float[] transitionedHours;
             float[] freshHours;

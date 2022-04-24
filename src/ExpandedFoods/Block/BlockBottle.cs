@@ -13,19 +13,22 @@ using Vintagestory.GameContent;
 
 namespace ExpandedFoods
 {
-    public class BlockBottle : BlockBucket
+    public class BlockBottle : BlockBucket, IContainedMeshSource
     {
         public override float CapacityLitres => Attributes?["capacityLitres"]?.AsFloat(1f) ?? 1f;
+        protected override string meshRefsCacheKey => "meshrefs";
+        protected override AssetLocation emptyShapeLoc => new AssetLocationAndSource("expandedfoods:glassbottle.json"); // doesn't work... try the shape too..
+        protected override AssetLocation contentShapeLoc => new AssetLocationAndSource("expandedfoods:glassbottle.json"); // doesn't work... try the shape too.
 
         public new MeshData GenMesh(ICoreClientAPI capi, ItemStack contentStack, BlockPos forBlockPos = null)
         {
             Shape shape = null;
             MeshData bucketmesh = null;
-            
+
 
             if (contentStack != null)
             {
-                WaterTightContainableProps props = GetInContainerProps(contentStack);
+                WaterTightContainableProps props = GetContainableProps(contentStack);
 
                 BottleTextureSource contentSource = new BottleTextureSource(capi, contentStack, props.Texture, this);
 
@@ -47,13 +50,51 @@ namespace ExpandedFoods
                 {
                     shape = capi.Assets.TryGet("expandedfoods:shapes/block/glassbottle.json").ToObject<Shape>();
                 }
-                
+
                 capi.Tesselator.TesselateShape("bucket", shape, out bucketmesh, contentSource, new Vec3f(Shape.rotateX, Shape.rotateY, Shape.rotateZ));
             }
 
 
             return bucketmesh;
         }
+
+        public MeshData GenMeshSideways(ICoreClientAPI capi, ItemStack contentStack, BlockPos forBlockPos = null)
+        {
+            Shape shape = null;
+            MeshData bucketmesh = null;
+
+
+            if (contentStack != null)
+            {
+                WaterTightContainableProps props = GetContainableProps(contentStack);
+
+                BottleTextureSource contentSource = new BottleTextureSource(capi, contentStack, props.Texture, this);
+
+                float level = contentStack.StackSize / props.ItemsPerLitre;
+
+                if (level <= 0.25f)
+                {
+                    shape = capi.Assets.TryGet("expandedfoods:shapes/block/glassbottleracked-1.json").ToObject<Shape>();
+                }
+                else if (level <= 0.5f)
+                {
+                    shape = capi.Assets.TryGet("expandedfoods:shapes/block/glassbottleracked-2.json").ToObject<Shape>();
+                }
+                else if (level < 1)
+                {
+                    shape = capi.Assets.TryGet("expandedfoods:shapes/block/glassbottleracked-3.json").ToObject<Shape>();
+                }
+                else
+                {
+                    shape = capi.Assets.TryGet("expandedfoods:shapes/block/glassbottle.json").ToObject<Shape>();
+                }
+
+                capi.Tesselator.TesselateShape("bucket", shape, out bucketmesh, contentSource, new Vec3f(Shape.rotateX, Shape.rotateY, Shape.rotateZ));
+            }
+
+            return bucketmesh;
+        }
+
 
         public override void OnBeforeRender(ICoreClientAPI capi, ItemStack itemstack, EnumItemRenderTarget target, ref ItemRenderInfo renderinfo)
         {
@@ -70,7 +111,7 @@ namespace ExpandedFoods
                 capi.ObjectCache["bottleMeshRefs"] = meshrefs = new Dictionary<string, MeshRef>();
             }
 
-            ItemStack contentStack = GetContent(capi.World, itemstack);
+            ItemStack contentStack = GetContent(itemstack);
             if (contentStack == null) return;
 
             MeshRef meshRef = null;
@@ -115,7 +156,7 @@ namespace ExpandedFoods
                 return;
             }
 
-            ItemStack content = GetContent(byEntity.World, itemslot.Itemstack);
+            ItemStack content = GetContent(itemslot.Itemstack);
 
             if (content != null && content.Collectible.GetNutritionProperties(byEntity.World, content, byEntity as Entity) != null)
             {
@@ -138,7 +179,7 @@ namespace ExpandedFoods
 
         public override bool OnHeldInteractStep(float secondsUsed, ItemSlot slot, EntityAgent byEntity, BlockSelection blockSel, EntitySelection entitySel)
         {
-            ItemStack content = GetContent(byEntity.World, slot.Itemstack);
+            ItemStack content = GetContent(slot.Itemstack);
             if (content == null || content.Collectible.GetNutritionProperties(byEntity.World, slot.Itemstack, byEntity as Entity) == null || (blockSel != null && !byEntity.Controls.Sneak)) return false;
 
 
@@ -185,7 +226,7 @@ namespace ExpandedFoods
 
         public override void OnHeldInteractStop(float secondsUsed, ItemSlot slot, EntityAgent byEntity, BlockSelection blockSel, EntitySelection entitySel)
         {
-            ItemStack content = GetContent(byEntity.World, slot.Itemstack);
+            ItemStack content = GetContent(slot.Itemstack);
             FoodNutritionProperties nutriProps = content?.Collectible.GetNutritionProperties(byEntity.World, content, byEntity as Entity);
 
             if (byEntity.World is IServerWorldAccessor && nutriProps != null && secondsUsed >= 0.95f)
@@ -213,7 +254,7 @@ namespace ExpandedFoods
         public override void GetHeldItemInfo(ItemSlot inSlot, StringBuilder dsc, IWorldAccessor world, bool withDebugInfo)
         {
             base.GetHeldItemInfo(inSlot, dsc, world, withDebugInfo);
-            ItemStack content = GetContent(world, inSlot.Itemstack);
+            ItemStack content = GetContent(inSlot.Itemstack);
             if (content != null)
             {
                 DummySlot dummy = new DummySlot(content);
@@ -227,7 +268,7 @@ namespace ExpandedFoods
         {
             dsc.Append(GetHeldItemName(inSlot.Itemstack));
             dsc.Append(", ");
-            ItemStack content = GetContent(world, inSlot.Itemstack);
+            ItemStack content = GetContent(inSlot.Itemstack);
             if (content != null)
             {
                 DummyInventory dummyInv = new DummyInventory(api);
@@ -241,43 +282,7 @@ namespace ExpandedFoods
             }
         }
 
-        public override int TryPutContent(IWorldAccessor world, ItemStack containerStack, ItemStack contentStack, int desiredItems)
-        {
-            if (contentStack == null) return 0;
 
-            ItemStack stack = GetContent(world, containerStack);
-
-            int availItems = contentStack.StackSize;
-
-            ILiquidSink sink = containerStack.Collectible as ILiquidSink;
-
-            if (stack == null)
-            {
-                WaterTightContainableProps props = GetInContainerProps(contentStack);
-                if (props == null || !props.Containable) return 0;
-
-
-                int placeableItems = (int)(sink.CapacityLitres * props.ItemsPerLitre);
-
-                ItemStack placedstack = contentStack.Clone();
-                placedstack.StackSize = GameMath.Min(availItems, desiredItems, placeableItems);
-                SetContent(containerStack, placedstack);
-
-                return Math.Min(desiredItems, placeableItems);
-            }
-            else
-            {
-                if (!stack.Equals(world, contentStack, GlobalConstants.IgnoredStackAttributes)) return 0;
-
-                WaterTightContainableProps props = GetContentProps(world, containerStack);
-
-                float maxItems = sink.CapacityLitres * props.ItemsPerLitre;
-                int placeableItems = (int)(maxItems - stack.StackSize);
-                stack.StackSize += Math.Min(placeableItems, desiredItems);
-
-                return Math.Min(placeableItems, desiredItems);
-            }
-        }
 
         public override bool OnBlockInteractStart(IWorldAccessor world, IPlayer byPlayer, BlockSelection blockSel)
         {
@@ -300,11 +305,11 @@ namespace ExpandedFoods
 
             if (obj is ILiquidSource && !singleTake)
             {
-                int moved = TryPutContent(world, blockSel.Position, (obj as ILiquidSource).GetContent(world, hotbarSlot.Itemstack), singlePut ? 1 : 9999);
+                int moved = TryPutLiquid(blockSel.Position, (obj as ILiquidSource).GetContent(hotbarSlot.Itemstack), singlePut ? 1 : 9999);
 
                 if (moved > 0)
                 {
-                    TryTakeContent(world, hotbarSlot.Itemstack, moved);
+                    (obj as ILiquidSource).TryTakeContent(hotbarSlot.Itemstack, moved);
                     (byPlayer as IClientPlayer)?.TriggerFpAnimation(EnumHandInteract.HeldItemInteract);
 
                     return true;
@@ -313,18 +318,18 @@ namespace ExpandedFoods
 
             if (obj is ILiquidSink && !singlePut)
             {
-                ItemStack owncontentStack = GetContent(world, blockSel.Position);
+                ItemStack owncontentStack = GetContent(blockSel.Position);
                 int moved = 0;
 
                 if (hotbarSlot.Itemstack.StackSize == 1)
                 {
-                    moved = TryPutContent(world, hotbarSlot.Itemstack, owncontentStack, singleTake ? 1 : 9999);
+                    moved = (obj as ILiquidSink).TryPutLiquid(hotbarSlot.Itemstack, owncontentStack, singleTake ? 1 : 9999);
                 }
                 else
                 {
                     ItemStack containerStack = hotbarSlot.Itemstack.Clone();
                     containerStack.StackSize = 1;
-                    moved = TryPutContent(world, containerStack, owncontentStack, singleTake ? 1 : 9999);
+                    moved = (obj as ILiquidSink).TryPutLiquid(containerStack, owncontentStack, singleTake ? 1 : 9999);
 
                     if (moved > 0)
                     {
@@ -338,7 +343,7 @@ namespace ExpandedFoods
 
                 if (moved > 0)
                 {
-                    TryTakeContent(world, blockSel.Position, moved);
+                    TryTakeContent(blockSel.Position, moved);
                     (byPlayer as IClientPlayer)?.TriggerFpAnimation(EnumHandInteract.HeldItemInteract);
                     return true;
                 }
@@ -353,7 +358,7 @@ namespace ExpandedFoods
 
             if (!entityItem.Swimming || entityItem.World.Side != EnumAppSide.Server) return;
 
-            ItemStack contents = GetContent(entityItem.World, entityItem.Itemstack);
+            ItemStack contents = GetContent(entityItem.Itemstack);
             if (contents != null && contents.Collectible.Code.Path == "rot")
             {
                 entityItem.World.SpawnItemEntity(contents, entityItem.ServerPos.XYZ);
@@ -543,6 +548,7 @@ namespace ExpandedFoods
 
         TextureAtlasPosition contentTextPos;
         TextureAtlasPosition blockTextPos;
+        TextureAtlasPosition corkTextPos;
         CompositeTexture contentTexture;
 
         public BottleTextureSource(ICoreClientAPI capi, ItemStack forContents, CompositeTexture contentTexture, Block bottle)
@@ -550,6 +556,7 @@ namespace ExpandedFoods
             this.capi = capi;
             this.forContents = forContents;
             this.contentTexture = contentTexture;
+            this.corkTextPos = capi.BlockTextureAtlas.GetPosition(bottle, "map");
             this.blockTextPos = capi.BlockTextureAtlas.GetPosition(bottle, "glass");
         }
 
@@ -557,6 +564,7 @@ namespace ExpandedFoods
         {
             get
             {
+                if (textureCode == "map" && corkTextPos != null) return corkTextPos;
                 if (textureCode == "glass" && blockTextPos != null) return blockTextPos;
                 if (contentTextPos == null)
                 {

@@ -16,7 +16,6 @@ namespace ExpandedFoods
         {
             base.Initialize(api);
 
-
             ownBlock = Block as BlockSaucepan;
      
 
@@ -81,8 +80,8 @@ namespace ExpandedFoods
 
         public override bool OnTesselation(ITerrainMeshPool mesher, ITesselatorAPI tesselator)
         {
-            mesher.AddMeshData(currentRightMesh.Clone().Rotate(new Vec3f(0.5f, 0.5f, 0.5f), 0, MeshAngle, 0));
-            return true;
+			mesher.AddMeshData(currentRightMesh);
+			return true;
         }
 
         public void RedoMesh()
@@ -91,11 +90,6 @@ namespace ExpandedFoods
             {
                 currentRightMesh = GenRightMesh();
             }
-
-            //if (currentRightMesh == null && isSealed == true)
-            //{
-            //    Api.World.PlaySoundAt(new AssetLocation("game:sounds/block/metaldoor-place.ogg"), Pos.X, Pos.Y, Pos.Z);
-            //}
         }
 
         public override float GetPerishRate()

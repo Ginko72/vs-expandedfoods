@@ -647,11 +647,6 @@ namespace ExpandedFoods
             renderer = null;
         }
 
-        public override void OnBlockBroken()
-        {
-            base.OnBlockBroken();
-        }
-
         ~BlockEntityMixingBowl()
         {
             if (ambientSound != null) ambientSound.Dispose();
@@ -796,7 +791,7 @@ namespace ExpandedFoods
         public CookingRecipe GetMatchingMixingRecipe(IWorldAccessor world, ItemStack[] stacks)
         {
             if (Pot == null) return null;
-            List<CookingRecipe> recipes = MixingRecipeRegistry.Loaded.MixingRecipes;
+            var recipes = MixingRecipeRegistry.Loaded.MixingRecipes;
             if (recipes == null) return null;
 
             for (int j = 0; j < recipes.Count; j++)
